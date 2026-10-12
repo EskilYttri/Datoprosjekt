@@ -12,7 +12,7 @@ from fastapi import Depends, FastAPI, HTTPException
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
-from app.core.batches import Batch, items_to_check, receive
+from app.core.batches import Batch, items_to_check, receive, register_sale
 from app.core.scan import read_code
 from app.db import create_tables, get_session
 from app.models import BatchRow, Delivery, Product
@@ -24,7 +24,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Datoprosjekt", lifespan=lifespan)
+app = FastAPI(title="Datovarsel", lifespan=lifespan)
 
 
 # --- what the requests and answers look like ---
@@ -62,6 +62,18 @@ class LineOut(BaseModel):
     expiry: date
     quantity: int        # how many are in the batch now, in total
     put_in_front: bool   # True = older than what's already in the store
+
+
+class SaleIn(BaseModel):
+    code: str          # the code that was scanned at the till
+    quantity: int = 1
+
+
+class SaleOut(BaseModel):
+    gtin: str
+    # How many we could NOT find a batch for. 0 = it all added up.
+    # Anything else means our numbers for this product are off.
+    missing: int
 
 
 class CheckItem(BaseModel):
@@ -177,6 +189,38 @@ def add_line(
         quantity=row.quantity,
         put_in_front=received.put_in_front,
     )
+
+
+@app.post("/sales")
+def sale(body: SaleIn, session: Session = Depends(get_session)) -> SaleOut:
+    """Something was sold. Take it out of the right batch."""
+    try:
+        result = read_code(body.code)
+    except ValueError as error:
+        raise HTTPException(400, str(error))
+
+    if body.quantity <= 0:
+        raise HTTPException(422, f"Can't sell {body.quantity} items")
+
+    product = session.get(Product, result.gtin)
+    if product is None:
+        raise HTTPException(404, f"Unknown product {result.gtin}")
+
+    rows = session.exec(select(BatchRow).where(BatchRow.gtin == result.gtin)).all()
+    batches, row_for = load_batches((row, product) for row in rows)
+
+    missing = register_sale(batches, result, body.quantity)
+
+    # register_sale can change the count and the guessed mark on any of
+    # the batches, so save them all.
+    for batch in batches:
+        row = row_for[id(batch)]
+        row.quantity = batch.quantity
+        row.guessed = batch.guessed
+        session.add(row)
+    session.commit()
+
+    return SaleOut(gtin=result.gtin, missing=missing)
 
 
 @app.get("/checklist")
