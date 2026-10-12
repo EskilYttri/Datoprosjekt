@@ -2,7 +2,9 @@
 
 from datetime import date
 
-from batches import Batch, items_to_check, register_sale
+import pytest
+
+from batches import Batch, items_to_check, receive, register_sale
 from scan import Scan
 
 TODAY = date(2026, 10, 12)
@@ -10,6 +12,77 @@ TODAY = date(2026, 10, 12)
 MILK = "07038010000010"
 MINCE = "07038010000065"   # kjøttdeig, has the square code with a date
 YOGHURT = "07038010000027"
+
+
+# --- a delivery comes in ---
+
+def test_new_product_becomes_a_new_batch():
+    batches = []
+
+    received = receive(batches, MILK, "Melk 1L", date(2026, 10, 20), 12)
+
+    assert batches == [Batch(MILK, "Melk 1L", 12, date(2026, 10, 20))]
+    assert received.batch is batches[0]
+    assert not received.put_in_front
+
+
+def test_same_product_and_same_date_goes_into_the_same_batch():
+    shelf = Batch(MILK, "Melk 1L", 4, date(2026, 10, 20))
+    batches = [shelf]
+
+    received = receive(batches, MILK, "Melk 1L", date(2026, 10, 20), 12)
+
+    assert batches == [shelf]
+    assert shelf.quantity == 16
+    assert received.batch is shelf
+
+
+def test_same_product_with_another_date_is_a_new_batch():
+    shelf = Batch(MILK, "Melk 1L", 4, date(2026, 10, 15))
+    batches = [shelf]
+
+    receive(batches, MILK, "Melk 1L", date(2026, 10, 20), 12)
+
+    assert len(batches) == 2
+    assert shelf.quantity == 4
+
+
+def test_worse_date_than_the_shelf_must_go_in_front():
+    # The ASKO case: the new delivery goes out of date before the old one.
+    batches = [Batch(MILK, "Melk 1L", 4, date(2026, 10, 20))]
+
+    received = receive(batches, MILK, "Melk 1L", date(2026, 10, 15), 12)
+
+    assert received.put_in_front
+
+
+def test_better_date_than_the_shelf_goes_behind_as_usual():
+    batches = [Batch(MILK, "Melk 1L", 4, date(2026, 10, 15))]
+
+    received = receive(batches, MILK, "Melk 1L", date(2026, 10, 20), 12)
+
+    assert not received.put_in_front
+
+
+def test_sold_out_batches_do_not_count_for_put_in_front():
+    batches = [Batch(MILK, "Melk 1L", 0, date(2026, 10, 20))]
+
+    received = receive(batches, MILK, "Melk 1L", date(2026, 10, 15), 12)
+
+    assert not received.put_in_front
+
+
+def test_other_products_do_not_count_for_put_in_front():
+    batches = [Batch(YOGHURT, "Yoghurt", 4, date(2026, 10, 20))]
+
+    received = receive(batches, MILK, "Melk 1L", date(2026, 10, 15), 12)
+
+    assert not received.put_in_front
+
+
+def test_receiving_zero_gives_an_error():
+    with pytest.raises(ValueError):
+        receive([], MILK, "Melk 1L", date(2026, 10, 20), 0)
 
 
 # --- normal barcode: we have to guess which pack was sold ---
