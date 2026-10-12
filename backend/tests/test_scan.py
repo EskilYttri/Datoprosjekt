@@ -7,7 +7,7 @@ from datetime import date
 
 import pytest
 
-from scan import SEPARATOR, read_code
+from app.core.scan import SEPARATOR, read_code
 
 
 def test_normal_barcode_has_no_date():

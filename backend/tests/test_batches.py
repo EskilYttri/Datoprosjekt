@@ -4,8 +4,8 @@ from datetime import date
 
 import pytest
 
-from batches import Batch, items_to_check, receive, register_sale
-from scan import Scan
+from app.core.batches import Batch, items_to_check, receive, register_sale
+from app.core.scan import Scan
 
 TODAY = date(2026, 10, 12)
 

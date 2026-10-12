@@ -9,7 +9,7 @@ date than what we already have on the shelf.
 from dataclasses import dataclass
 from datetime import date, timedelta
 
-from scan import Scan
+from .scan import Scan
 
 
 @dataclass

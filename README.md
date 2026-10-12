@@ -6,11 +6,21 @@ The idea: every delivery is registered as one or more *batches* (a product, a qu
 
 ## Status
 
-Early backend. There is no user interface yet, only the core logic and its tests.
+Early backend: the core logic and a web API with a database. There is no user interface yet.
+
+```
+backend/
+├── app/
+│   ├── core/          the rules: scan.py and batches.py, no database here
+│   ├── models.py      the tables in the database
+│   ├── db.py          the connection to the database (SQLite by default)
+│   └── main.py        the web API
+└── tests/
+```
 
 ## How it works
 
-### `scan.py` – reading barcodes
+### `core/scan.py` – reading barcodes
 
 The store has two kinds of codes:
 
@@ -24,7 +34,7 @@ The store has two kinds of codes:
 - day `00`, which means the last day of the month
 - batch numbers, serial numbers and weights, which are skipped over
 
-### `batches.py` – tracking what is in the store
+### `core/batches.py` – tracking what is in the store
 
 - `receive(batches, gtin, name, expiry, quantity)` registers one line of a delivery:
   - If there already is a batch with the same product and the same date, the goods go into that batch.
@@ -36,16 +46,36 @@ The store has two kinds of codes:
   - Returns how many items it could not find a batch for (`0` means everything added up).
 - `items_to_check(batches, today, days_ahead=2)` returns everything still in stock that expires within `days_ahead` days, including what has already expired, oldest date first.
 
+### `main.py` – the web API
+
+| Method | Path | What it does |
+| --- | --- | --- |
+| POST | `/scan` | Text from the scanner in, product number, date and name out |
+| PUT | `/products/{gtin}` | Add a product or change its name |
+| POST | `/deliveries` | Open a new delivery, for example from ASKO |
+| POST | `/deliveries/{id}/lines` | One scanned line of the delivery: goes into the right batch, says `put_in_front` if it must go in front |
+| GET | `/checklist` | What to check today, oldest date first |
+
+The endpoints only load and save. All rules about dates and batches are in `core/`.
+
 ## Getting started
 
-Requires Python 3.10 or newer and [pytest](https://pytest.org).
+Requires Python 3.10 or newer.
 
 ```bash
 git clone https://github.com/EskilYttri/Datoprosjekt.git
-cd Datoprosjekt
-python -m pip install pytest
+cd Datoprosjekt/backend
+python -m pip install -e ".[test]"
 python -m pytest
 ```
+
+Start the server and open http://127.0.0.1:8000/docs to try the API in the browser:
+
+```bash
+uvicorn app.main:app --reload
+```
+
+The data is saved in `datoprosjekt.db` in the folder you start the server from.
 
 ## Contributing
 
