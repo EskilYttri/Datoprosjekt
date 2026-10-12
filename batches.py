@@ -21,6 +21,46 @@ class Batch:
     guessed: bool = False  # True = the number left is a guess, see below
 
 
+@dataclass
+class Received:
+    batch: Batch         # the batch the goods went into
+    put_in_front: bool   # True = older than what we already have, see below
+
+
+def receive(
+    batches: list[Batch], gtin: str, name: str, expiry: date, quantity: int
+) -> Received:
+    """One line on a delivery came in. Put it in the right batch.
+
+    - If we already have a batch of this product with the same date, the
+      goods go into that one. Same product and same date is the same batch,
+      no matter which delivery it came on.
+
+    - Otherwise it is a new batch, and it is added to the list.
+
+    We also check if the new date is EARLIER than a date we still have in
+    the store. That is the ASKO case: the new goods go out of date first,
+    so they have to go in front on the shelf, not behind the old ones.
+    """
+    if quantity <= 0:
+        raise ValueError(f"Can't receive {quantity} items")
+
+    # Is there anything in the store that lasts longer than the new goods?
+    put_in_front = any(
+        b.gtin == gtin and b.quantity > 0 and b.expiry > expiry
+        for b in batches
+    )
+
+    for batch in batches:
+        if batch.gtin == gtin and batch.expiry == expiry:
+            batch.quantity += quantity
+            return Received(batch, put_in_front)
+
+    batch = Batch(gtin, name, quantity, expiry)
+    batches.append(batch)
+    return Received(batch, put_in_front)
+
+
 def register_sale(batches: list[Batch], scan: Scan, quantity: int = 1) -> int:
     """Something was scanned at the till. Take it out of the right batch.
 

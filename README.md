@@ -26,6 +26,10 @@ The store has two kinds of codes:
 
 ### `batches.py` – tracking what is in the store
 
+- `receive(batches, gtin, name, expiry, quantity)` registers one line of a delivery:
+  - If there already is a batch with the same product and the same date, the goods go into that batch.
+  - Otherwise a new batch is added to the list.
+  - The result says `put_in_front` when the new date is earlier than a date still in the store (for example when a later delivery has a worse date), so the new goods should be placed in front on the shelf.
 - `register_sale(batches, scan, quantity=1)` takes sold items out of the right batch:
   - If the scan had a date, it takes from exactly that batch.
   - If not, it assumes the oldest date was sold. If there were several dates to choose from, the batches are marked as `guessed`.
