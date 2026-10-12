@@ -155,6 +155,77 @@ def test_line_with_zero_items(client):
     assert answer.status_code == 422
 
 
+# --- sales ---
+
+def receive_milk(client, quantity, expiry):
+    client.post(
+        f"/deliveries/{open_delivery(client)}/lines",
+        json={"code": MILK_BARCODE, "quantity": quantity, "expiry": expiry},
+    )
+
+
+def checklist(client):
+    return client.get("/checklist", params={"today": "2026-10-12", "days_ahead": 30}).json()
+
+
+def test_sale_takes_from_the_oldest_date_and_marks_the_guess(client):
+    add_products(client)
+    receive_milk(client, 10, "2026-10-20")
+    receive_milk(client, 10, "2026-10-15")  # later delivery, worse date
+
+    answer = client.post("/sales", json={"code": MILK_BARCODE, "quantity": 4}).json()
+
+    assert answer == {"gtin": MILK, "missing": 0}
+    assert [(i["expiry"], i["quantity"], i["guessed"]) for i in checklist(client)] == [
+        ("2026-10-15", 6, True),
+        ("2026-10-20", 10, True),
+    ]
+
+
+def test_sale_with_date_in_the_code_takes_from_that_batch(client):
+    add_products(client)
+    delivery = open_delivery(client)
+    client.post(f"/deliveries/{delivery}/lines", json={"code": MINCE_SQUARE_CODE, "quantity": 6})
+
+    client.post("/sales", json={"code": MINCE_SQUARE_CODE})
+
+    assert [(i["name"], i["quantity"], i["guessed"]) for i in checklist(client)] == [
+        ("Kjøttdeig 400g", 5, False),
+    ]
+
+
+def test_sold_out_batch_leaves_the_checklist(client):
+    add_products(client)
+    receive_milk(client, 3, "2026-10-13")
+
+    client.post("/sales", json={"code": MILK_BARCODE, "quantity": 3})
+
+    assert checklist(client) == []
+
+
+def test_selling_more_than_we_have_says_how_many_are_missing(client):
+    add_products(client)
+    receive_milk(client, 3, "2026-10-13")
+
+    answer = client.post("/sales", json={"code": MILK_BARCODE, "quantity": 5}).json()
+
+    assert answer["missing"] == 2
+
+
+def test_sale_of_unknown_product(client):
+    answer = client.post("/sales", json={"code": MILK_BARCODE})
+
+    assert answer.status_code == 404
+
+
+def test_sale_of_zero_items(client):
+    add_products(client)
+
+    answer = client.post("/sales", json={"code": MILK_BARCODE, "quantity": 0})
+
+    assert answer.status_code == 422
+
+
 # --- the list of what to check ---
 
 def test_checklist_has_what_goes_out_soon_oldest_first(client):

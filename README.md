@@ -1,6 +1,6 @@
-# Datoprosjekt
+# Datovarsel
 
-Small app for keeping better track of the expiry dates of food delivered to retail stores.
+Warns a grocery store about goods that are about to go out of date, without anyone having to check every item on the shelf.
 
 The idea: every delivery is registered as one or more *batches* (a product, a quantity and an expiry date). When items are scanned at the till, they are taken out of the right batch, so the store always has a list of what is about to go out of date and should be checked on the shelf.
 
@@ -54,6 +54,7 @@ The store has two kinds of codes:
 | PUT | `/products/{gtin}` | Add a product or change its name |
 | POST | `/deliveries` | Open a new delivery, for example from ASKO |
 | POST | `/deliveries/{id}/lines` | One scanned line of the delivery: goes into the right batch, says `put_in_front` if it must go in front |
+| POST | `/sales` | Something was sold: takes it out of the right batch |
 | GET | `/checklist` | What to check today, oldest date first |
 
 The endpoints only load and save. All rules about dates and batches are in `core/`.
@@ -75,7 +76,7 @@ Start the server and open http://127.0.0.1:8000/docs to try the API in the brows
 uvicorn app.main:app --reload
 ```
 
-The data is saved in `datoprosjekt.db` in the folder you start the server from.
+The data is saved in `datovarsel.db` in the folder you start the server from.
 
 ## Contributing
 

@@ -1,6 +1,6 @@
 """The connection to the database.
 
-By default everything is saved in a file called datoprosjekt.db next to
+By default everything is saved in a file called datovarsel.db next to
 where you start the server. Set DATABASE_URL to use another database.
 """
 
@@ -8,7 +8,7 @@ import os
 
 from sqlmodel import Session, SQLModel, create_engine
 
-DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///datoprosjekt.db")
+DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///datovarsel.db")
 
 # check_same_thread=False: FastAPI can answer requests on different
 # threads, and SQLite only allows that if we say it's fine.
